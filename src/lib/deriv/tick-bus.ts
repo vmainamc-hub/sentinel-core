@@ -61,7 +61,26 @@ class DerivTickBus {
   private watchdogTimer: ReturnType<typeof setInterval> | null = null;
   private endpointIndex = 0;
 
+  // ── Reliability state ───────────────────────────────────────────────
+  /** Monotonic socket generation; messages/handlers from replaced sockets are rejected. */
+  private generation = 0;
+  private reqSeq = 1;
+  /** req_id -> pending history request metadata. */
+  private pendingHistory = new Map<
+    number,
+    { symbol: string; kind: "seed" | "catchup"; sentAt: number; generation: number }
+  >();
+  /** symbol -> req_id of the in-flight history request (max one per symbol). */
+  private inflightBySymbol = new Map<string, number>();
+  /** symbol -> earliest timestamp at which another catch-up may be sent. */
+  private catchupCooldown = new Map<string, number>();
+  private catchupFailures = new Map<string, number>();
+  private reconnectCount = 0;
+  private lastTickAt = 0;
+  private lastHistoryAt = 0;
+
   private envHooked = false;
+
   private wakeLock: any = null;
 
   getStatus(): BusStatus {

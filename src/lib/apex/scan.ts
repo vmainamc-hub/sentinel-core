@@ -166,7 +166,9 @@ export function rankOpportunities(
 } {
   const rejected: ScanResult["rejected"] = [];
 
-  // Ingest all active market intels into the 90-cell Observation Engine
+  // READ-ONLY. ApexCore is the single authoritative producer of Sentinel
+  // observations; ranking never ingests, never qualifies and never mutates
+  // engine state. It only classifies unusable markets for the reject list.
   for (const intel of intels) {
     if (intel.dataState === "UNAVAILABLE") {
       rejected.push({ symbol: intel.symbol, contract: "—", reason: "DATA UNAVAILABLE" });
@@ -182,15 +184,9 @@ export function rankOpportunities(
         contract: "—",
         reason: `DATA THIN — ${intel.ticks} ticks (< ${opts.minTicks})`,
       });
-      continue;
-    }
-
-    const marketDigits = apexCore.getDeepDigits(intel.symbol);
-    const inputs = mapIntelToObservationInputs(intel, marketDigits);
-    for (const input of inputs) {
-      observationEngine.ingest(input);
     }
   }
+
 
   // Get all 90 cells ranked by composite score descending with hard blocks forced to bottom
   const allRankedDossiers = observationEngine.getAllRanked();
@@ -221,11 +217,10 @@ export function rankOpportunities(
       (dossier.veto?.active && dossier.veto?.hard),
     );
 
+    // Read-only: qualification is produced by ApexCore's ingestion path only.
     const qualification =
-      observationEngine.qualificationManager.getActive(dossier.cellId) ??
-      (dossier.state === "RIPE"
-        ? observationEngine.qualificationManager.attemptQualify(dossier, Date.now())
-        : null);
+      observationEngine.qualificationManager.getActive(dossier.cellId) ?? null;
+
 
     const entryPoint: EntryPointReport = dossier.entryPoint ??
       (dossier.entryDigit?.raw as EntryPointReport) ??

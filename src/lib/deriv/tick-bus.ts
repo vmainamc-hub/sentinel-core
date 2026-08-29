@@ -61,7 +61,26 @@ class DerivTickBus {
   private watchdogTimer: ReturnType<typeof setInterval> | null = null;
   private endpointIndex = 0;
 
+  // ── Reliability state ───────────────────────────────────────────────
+  /** Monotonic socket generation; messages/handlers from replaced sockets are rejected. */
+  private generation = 0;
+  private reqSeq = 1;
+  /** req_id -> pending history request metadata. */
+  private pendingHistory = new Map<
+    number,
+    { symbol: string; kind: "seed" | "catchup"; sentAt: number; generation: number }
+  >();
+  /** symbol -> req_id of the in-flight history request (max one per symbol). */
+  private inflightBySymbol = new Map<string, number>();
+  /** symbol -> earliest timestamp at which another catch-up may be sent. */
+  private catchupCooldown = new Map<string, number>();
+  private catchupFailures = new Map<string, number>();
+  private reconnectCount = 0;
+  private lastTickAt = 0;
+  private lastHistoryAt = 0;
+
   private envHooked = false;
+
   private wakeLock: any = null;
 
   getStatus(): BusStatus {
@@ -222,7 +241,7 @@ class DerivTickBus {
 
     this.setStatus("connecting");
     const activeUrl = DERIV_FALLBACK_ENDPOINTS[this.endpointIndex % DERIV_FALLBACK_ENDPOINTS.length];
-    
+
     let ws: WebSocket;
     try {
       ws = new WebSocket(activeUrl);
@@ -232,11 +251,17 @@ class DerivTickBus {
       this.scheduleReconnect();
       return;
     }
+    // Any socket created earlier is now obsolete: its handlers must not be
+    // able to touch buffers, status, subscriptions or reconnect state.
+    const gen = ++this.generation;
     this.ws = ws;
+    this.pendingHistory.clear();
+    this.inflightBySymbol.clear();
 
     // Handshake Timeout Guard: if connection hangs in CONNECTING state, abort and failover
     this.handshakeTimer = setTimeout(() => {
       this.handshakeTimer = null;
+      if (gen !== this.generation) return;
       if (ws.readyState === WebSocket.CONNECTING) {
         try {
           ws.close();
@@ -247,6 +272,12 @@ class DerivTickBus {
     }, HANDSHAKE_TIMEOUT_MS);
 
     ws.onopen = () => {
+      if (gen !== this.generation) {
+        try {
+          ws.close();
+        } catch {}
+        return;
+      }
       if (this.handshakeTimer) {
         clearTimeout(this.handshakeTimer);
         this.handshakeTimer = null;
@@ -254,6 +285,8 @@ class DerivTickBus {
       this.setStatus("live");
       this.reconnectDelay = 1000;
       this.subIds.clear();
+      this.catchupCooldown.clear();
+      this.catchupFailures.clear();
       this.lastMessageAt = Date.now();
       for (const sym of this.refcount.keys()) {
         this.sendHistoryRequest(sym);
@@ -264,11 +297,13 @@ class DerivTickBus {
     };
 
     ws.onmessage = (ev) => {
+      if (gen !== this.generation) return; // stale socket — ignore entirely
       this.lastMessageAt = Date.now();
       let msg: any;
       try {
         msg = JSON.parse(ev.data);
       } catch {
+
         return;
       }
       if (msg.pong || msg.msg_type === "ping" || msg.ping) {
@@ -276,6 +311,10 @@ class DerivTickBus {
       }
 
       if (msg.error) {
+        // Clear the pending slot so a failed history request cannot wedge a
+        // symbol forever; back off before retrying.
+        const errId = Number(msg.echo_req?.req_id ?? msg.req_id);
+        if (Number.isFinite(errId)) this.clearPending(errId, true);
         return;
       }
 
@@ -288,38 +327,57 @@ class DerivTickBus {
         const lastKnown = this.lastEpoch.get(sym) ?? 0;
         if (!Number.isFinite(epoch) || !Number.isFinite(price)) return;
         if (epoch <= lastKnown) return;
-        
+
         const tk: Tick = { t: epoch * 1000, price };
         this.appendTick(sym, tk);
         this.lastEpoch.set(sym, epoch);
-        
+        this.lastTickAt = Date.now();
+        this.catchupFailures.delete(sym);
+
         this.tickListeners.forEach((l) => l(sym, tk));
         return;
       }
 
-      if (msg.msg_type === "history" && msg.history && msg.echo_req?.ticks_history) {
-        const sym = msg.echo_req.ticks_history as string;
+      if (msg.msg_type === "history" && msg.history) {
+        // Correlation first: req_id is authoritative. echo_req is only a
+        // validated fallback for servers that omit the correlation id.
+        const reqId = Number(msg.req_id ?? msg.echo_req?.req_id);
+        const pending = Number.isFinite(reqId) ? this.pendingHistory.get(reqId) : undefined;
+        const echoSym =
+          typeof msg.echo_req?.ticks_history === "string"
+            ? (msg.echo_req.ticks_history as string)
+            : null;
+        const sym = pending?.symbol ?? echoSym;
+        if (!sym) return;
+        if (Number.isFinite(reqId)) this.clearPending(reqId, false);
+        else if (echoSym) this.clearSymbolPending(echoSym);
+        this.lastHistoryAt = Date.now();
+        this.catchupFailures.delete(sym);
+
         if (msg.pip_size !== undefined) this.setPip(sym, Number(msg.pip_size));
         const { prices, times } = msg.history as { prices: number[]; times: number[] };
-        const isSeed = (msg.echo_req.count ?? 0) >= HISTORY_COUNT;
+        if (!prices?.length || !times?.length) return;
+        const isSeed = pending
+          ? pending.kind === "seed"
+          : (msg.echo_req?.count ?? 0) >= HISTORY_COUNT;
         const prev = this.buffers.get(sym) ?? [];
         const lastKnown = this.lastEpoch.get(sym) ?? 0;
         const fresh: Tick[] = [];
-        
+
         for (let i = 0; i < prices.length; i++) {
           const epoch = times[i];
           if (epoch > lastKnown) {
             fresh.push({ t: epoch * 1000, price: Number(prices[i]) });
           }
         }
-        
+
         if (isSeed || prev.length === 0) {
           const seed: Tick[] = new Array(prices.length);
           for (let i = 0; i < prices.length; i++) {
             seed[i] = { t: times[i] * 1000, price: Number(prices[i]) };
           }
           this.setBuffer(sym, seed);
-          if (times.length) this.lastEpoch.set(sym, times[times.length - 1]);
+          this.lastEpoch.set(sym, times[times.length - 1]);
           const currentBuf = this.getTicks(sym);
           this.historyListeners.forEach((l) => l(sym, currentBuf));
         } else if (fresh.length) {
@@ -335,6 +393,7 @@ class DerivTickBus {
     };
 
     ws.onerror = () => {
+      if (gen !== this.generation) return;
       if (this.handshakeTimer) {
         clearTimeout(this.handshakeTimer);
         this.handshakeTimer = null;
@@ -343,6 +402,7 @@ class DerivTickBus {
     };
 
     ws.onclose = () => {
+      if (gen !== this.generation) return; // a newer socket already owns the bus
       if (this.handshakeTimer) {
         clearTimeout(this.handshakeTimer);
         this.handshakeTimer = null;
@@ -351,17 +411,81 @@ class DerivTickBus {
       this.stopWatchdog();
       this.ws = null;
       this.subIds.clear();
-      
+      this.pendingHistory.clear();
+      this.inflightBySymbol.clear();
+
       if (this.refcount.size === 0) {
         this.setStatus("idle");
         return;
       }
-      
+
       this.setStatus("error");
       this.endpointIndex++; // Try alternate endpoint on failure
       this.scheduleReconnect();
     };
   }
+
+  /** Resolve a pending history request; `failed` applies catch-up backoff. */
+  private clearPending(reqId: number, failed: boolean) {
+    const pending = this.pendingHistory.get(reqId);
+    if (!pending) return;
+    this.pendingHistory.delete(reqId);
+    if (this.inflightBySymbol.get(pending.symbol) === reqId) {
+      this.inflightBySymbol.delete(pending.symbol);
+    }
+    if (failed) {
+      const fails = (this.catchupFailures.get(pending.symbol) ?? 0) + 1;
+      this.catchupFailures.set(pending.symbol, fails);
+      this.catchupCooldown.set(
+        pending.symbol,
+        Date.now() + Math.min(30_000, 2_500 * 2 ** Math.min(fails, 4)),
+      );
+    }
+  }
+
+  private clearSymbolPending(sym: string) {
+    const reqId = this.inflightBySymbol.get(sym);
+    if (reqId !== undefined) this.clearPending(reqId, false);
+  }
+
+  /** Expire history requests that never received a response. */
+  private expireStalePending(now: number) {
+    for (const [reqId, pending] of this.pendingHistory.entries()) {
+      if (now - pending.sentAt > HISTORY_TIMEOUT_MS) {
+        this.clearPending(reqId, true);
+      }
+    }
+  }
+
+  /** Observable reliability state for the UI and diagnostics panels. */
+  getDiagnostics(): {
+    status: BusStatus;
+    generation: number;
+    reconnects: number;
+    subscribedSymbols: number;
+    pendingHistory: number;
+    lastMessageAt: number;
+    lastTickAt: number;
+    lastHistoryAt: number;
+    bufferedSymbols: number;
+    bufferedTicks: number;
+  } {
+    let bufferedTicks = 0;
+    for (const b of this.buffers.values()) bufferedTicks += b.length;
+    return {
+      status: this.status,
+      generation: this.generation,
+      reconnects: this.reconnectCount,
+      subscribedSymbols: this.refcount.size,
+      pendingHistory: this.pendingHistory.size,
+      lastMessageAt: this.lastMessageAt,
+      lastTickAt: this.lastTickAt,
+      lastHistoryAt: this.lastHistoryAt,
+      bufferedSymbols: this.buffers.size,
+      bufferedTicks,
+    };
+  }
+
 
   private scheduleReconnect() {
     if (this.reconnectTimer) return;

@@ -260,7 +260,7 @@ describe("SENTINEL MASTER TEST SUITE — ARCHITECTURE TESTS 1 TO 13", () => {
 describe("SENTINEL MASTER TEST SUITE — STATISTICAL DISCIPLINE TESTS 14 TO 18", () => {
   // TEST 14 — BELOW MINIMUM SAMPLE
   it("TEST 14: engine below MIN_N=25 sample -> no live influence; once reached -> eligible", () => {
-    const trades20: SimTrade[] = Array.from({ length: 20 }, (_, i) => ({
+    const trades20= Array.from({ length: 20 }, (_, i) => ({
       id: `t-${i}`,
       symbol: "1HZ10V",
       market: "Volatility 10 (1s) Index",
@@ -285,7 +285,7 @@ describe("SENTINEL MASTER TEST SUITE — STATISTICAL DISCIPLINE TESTS 14 TO 18",
     }));
 
     // 20 trades (< 25) -> influence is 1.0 neutral
-    expect(engineInfluence("Digit Pressure", trades20)).toBe(1.0);
+    expect(engineInfluence("Digit Pressure", asTrades(trades20))).toBe(1.0);
 
     // 30 trades (>= 25) -> influence becomes eligible
     const trades30 = [
@@ -295,7 +295,7 @@ describe("SENTINEL MASTER TEST SUITE — STATISTICAL DISCIPLINE TESTS 14 TO 18",
         id: `t-more-${i}`,
       })),
     ];
-    expect(engineInfluence("Digit Pressure", trades30)).toBeGreaterThan(1.0);
+    expect(engineInfluence("Digit Pressure", asTrades(trades30))).toBeGreaterThan(1.0);
   });
 
   // TEST 15 — TIME DECAY
@@ -304,7 +304,7 @@ describe("SENTINEL MASTER TEST SUITE — STATISTICAL DISCIPLINE TESTS 14 TO 18",
     const oldTime = now - 3 * EFFECTIVENESS_HALF_LIFE_MS; // 72 hours ago
     const newTime = now - 1000; // 1 second ago
 
-    const oldTrades: SimTrade[] = Array.from({ length: 30 }, (_, i) => ({
+    const oldTrades= Array.from({ length: 30 }, (_, i) => ({
       id: `old-${i}`,
       symbol: "1HZ10V",
       market: "Volatility 10 (1s) Index",
@@ -328,7 +328,7 @@ describe("SENTINEL MASTER TEST SUITE — STATISTICAL DISCIPLINE TESTS 14 TO 18",
       },
     }));
 
-    const newTrades: SimTrade[] = Array.from({ length: 30 }, (_, i) => ({
+    const newTrades= Array.from({ length: 30 }, (_, i) => ({
       id: `new-${i}`,
       symbol: "1HZ10V",
       market: "Volatility 10 (1s) Index",
@@ -352,8 +352,8 @@ describe("SENTINEL MASTER TEST SUITE — STATISTICAL DISCIPLINE TESTS 14 TO 18",
       },
     }));
 
-    const oldInf = engineInfluence("Trend Engine", oldTrades, now);
-    const newInf = engineInfluence("Trend Engine", newTrades, now);
+    const oldInf = engineInfluence("Trend Engine", asTrades(oldTrades), now);
+    const newInf = engineInfluence("Trend Engine", asTrades(newTrades), now);
 
     expect(oldInf).toBeDefined();
     expect(newInf).toBeDefined();
@@ -361,7 +361,7 @@ describe("SENTINEL MASTER TEST SUITE — STATISTICAL DISCIPLINE TESTS 14 TO 18",
 
   // TEST 16 — HARD CAP
   it("TEST 16: mathematically extreme history -> applied influence strictly clamped to [0.5, 1.4]", () => {
-    const extremeTrades: SimTrade[] = Array.from({ length: 100 }, (_, i) => ({
+    const extremeTrades= Array.from({ length: 100 }, (_, i) => ({
       id: `win-${i}`,
       symbol: "1HZ10V",
       market: "Volatility 10 (1s) Index",
@@ -385,7 +385,7 @@ describe("SENTINEL MASTER TEST SUITE — STATISTICAL DISCIPLINE TESTS 14 TO 18",
       },
     }));
 
-    const inf = engineInfluence("Supreme Engine", extremeTrades);
+    const inf = engineInfluence("Supreme Engine", asTrades(extremeTrades));
     expect(inf).toBeLessThanOrEqual(1.4);
     expect(inf).toBeGreaterThanOrEqual(0.5);
   });
@@ -441,7 +441,7 @@ describe("SENTINEL MASTER TEST SUITE — STATISTICAL DISCIPLINE TESTS 14 TO 18",
 describe("SENTINEL MASTER TEST SUITE — FOUR QUALITY SYSTEMS & THRESHOLDS (TESTS 29A-F, 30)", () => {
   it("29A: Apex effectiveness modulates winning/losing engines after required sample", () => {
     const now = Date.now();
-    const trades: SimTrade[] = [
+    const trades= [
       ...Array.from({ length: 30 }, (_, i) => ({
         id: `win-${i}`,
         symbol: "1HZ10V",
@@ -482,8 +482,8 @@ describe("SENTINEL MASTER TEST SUITE — FOUR QUALITY SYSTEMS & THRESHOLDS (TEST
       })),
     ];
 
-    const goodInf = engineInfluence("GoodEngine", trades, now);
-    const badInf = engineInfluence("BadEngine", trades, now);
+    const goodInf = engineInfluence("GoodEngine", asTrades(trades), now);
+    const badInf = engineInfluence("BadEngine", asTrades(trades), now);
 
     expect(goodInf).toBeGreaterThan(1.0);
     expect(badInf).toBeLessThan(1.0);
@@ -513,7 +513,7 @@ describe("SENTINEL MASTER TEST SUITE — FOUR QUALITY SYSTEMS & THRESHOLDS (TEST
   });
 
   it("29F: Ledger attribution verified with simulator trade engineVotes", () => {
-    const trade: SimTrade = {
+    const trade = {
       id: "ledger-test-1",
       symbol: "1HZ10V",
       market: "Volatility 10 (1s) Index",
@@ -540,7 +540,7 @@ describe("SENTINEL MASTER TEST SUITE — FOUR QUALITY SYSTEMS & THRESHOLDS (TEST
       },
     };
 
-    const records = engineEffectiveness([trade]);
+    const records = engineEffectiveness(asTrades([trade]));
     expect(records.some((r) => r.engine === "Digit Pressure")).toBe(true);
     expect(records.some((r) => r.engine === "Markov Transition")).toBe(true);
   });

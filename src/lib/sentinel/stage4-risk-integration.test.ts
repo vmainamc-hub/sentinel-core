@@ -658,7 +658,7 @@ describe("Section 20: Diagnostic NEAR-SIGNAL Tests", () => {
       } as any,
       score: 85,
       dangerComposition: { total: 20 } as any,
-      clearance: { state: "CLEAR", blockers: [], warnings: [] },
+      clearance: { state: "CLEAR", blockers: [], cautions: [] } as any,
       blocked: false,
       executionReady: true,
       finalDecision: { verdict: "CLEARED" } as any,

@@ -375,13 +375,28 @@ export class ObservationEngine {
    * market) sharing the same underlying data stream.
    */
   ingest(input: EngineEvidenceInput): ObservationDossier {
-    this.lastIngestAt = input.timestamp || Date.now();
-    if (this.errorsCount > 0) {
-      this.errorsCount = Math.max(0, this.errorsCount - 0.05);
-    }
     const id = `${input.marketId}:${input.proposition}` as CellId;
     const cell = this.cells.get(id);
     if (!cell) throw new Error(`Unknown observation cell: ${id}`);
+
+    // ── Exactly-once ingestion guard ────────────────────────────────────
+    // ApexCore is the single authoritative producer. Any repeated or
+    // out-of-order observation for the same source identity is rejected
+    // deterministically instead of advancing Sentinel state twice.
+    const ts = input.timestamp || 0;
+    const seen = this.lastAcceptedTs.get(id);
+    if (seen !== undefined && ts <= seen) {
+      if (ts === seen) this.duplicateCount += 1;
+      else this.staleCount += 1;
+      return cell.getDossier() ?? cell.ingest(input);
+    }
+    this.lastAcceptedTs.set(id, ts);
+    this.acceptedCount += 1;
+
+    this.lastIngestAt = ts || Date.now();
+    if (this.errorsCount > 0) {
+      this.errorsCount = Math.max(0, this.errorsCount - 0.05);
+    }
 
     const materialRegimeShift = this.regimeTracker.update(
       input.marketId,
@@ -389,6 +404,7 @@ export class ObservationEngine {
       input.timestamp,
     );
     const dossier = cell.ingest(input);
+
 
     if (materialRegimeShift) {
       this.reEvaluateMarket(input.marketId, input.timestamp);

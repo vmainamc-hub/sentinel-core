@@ -90,7 +90,6 @@ function createMockMarket(symbol: string, name: string, biasDigit: number = 7, t
     ticks: tickCount,
     lastTickAt: Date.now() - 500,
     ageMs: 500,
-    digits,
     contracts,
     best: contracts[0],
     stats: {

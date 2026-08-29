@@ -198,15 +198,71 @@ export function emptyEvidenceInput(
 }
 
 /**
- * Maps live MarketIntel from ApexCore to an array of EngineEvidenceInputs
- * (one per contract/proposition) by faithfully consuming genuine engine outputs:
- * 1,000-tick structural psychology, 15/30/60/120 pressure windows, losing-side
- * pressure, entry-digit lab, regime detector, momentum, and veto engine.
+ * Immutable per-market snapshot cache.
+ *
+ * The mapping below is a heavyweight analytical boundary (spine, regime,
+ * pressure, price action, exposure, EntryLab). It is deterministic for a given
+ * source identity — market + analysis timestamp + tick count — so the result is
+ * memoised and shared. Any caller that re-requests the same snapshot receives
+ * the exact same frozen array instead of re-running the engines.
+ */
+interface SnapshotEntry {
+  key: string;
+  inputs: EngineEvidenceInput[];
+}
+const snapshotCache = new Map<string, SnapshotEntry>();
+
+export interface AdapterCacheStats {
+  markets: number;
+  hits: number;
+  misses: number;
+}
+let adapterHits = 0;
+let adapterMisses = 0;
+
+export function adapterCacheStats(): AdapterCacheStats {
+  return { markets: snapshotCache.size, hits: adapterHits, misses: adapterMisses };
+}
+
+export function resetAdapterCache(): void {
+  snapshotCache.clear();
+  adapterHits = 0;
+  adapterMisses = 0;
+}
+
+/**
+ * Cached, read-safe entry point. Produces (or reuses) the canonical immutable
+ * observation snapshot for one market.
  */
 export function mapIntelToObservationInputs(
   intel: any,
   rawDigits?: readonly number[],
 ): EngineEvidenceInput[] {
+  if (!intel || !intel.symbol || !intel.contracts) return [];
+  const symbol = String(intel.symbol);
+  const key = `${intel.updatedAt ?? 0}:${rawDigits?.length ?? 0}:${intel.contracts.length}`;
+  const cached = snapshotCache.get(symbol);
+  if (cached && cached.key === key) {
+    adapterHits += 1;
+    return cached.inputs;
+  }
+  adapterMisses += 1;
+  const inputs = computeIntelObservationInputs(intel, rawDigits);
+  snapshotCache.set(symbol, { key, inputs });
+  return inputs;
+}
+
+/**
+ * Maps live MarketIntel from ApexCore to an array of EngineEvidenceInputs
+ * (one per contract/proposition) by faithfully consuming genuine engine outputs:
+ * 1,000-tick structural psychology, 15/30/60/120 pressure windows, losing-side
+ * pressure, entry-digit lab, regime detector, momentum, and veto engine.
+ */
+export function computeIntelObservationInputs(
+  intel: any,
+  rawDigits?: readonly number[],
+): EngineEvidenceInput[] {
+
   if (!intel || !intel.symbol || !intel.contracts) return [];
 
   const marketId = intel.symbol as MarketId;

@@ -272,6 +272,7 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
         reason: "",
         simBefore: { n: 0, winRate: 0 },
         simRecentBefore: { n: 0, winRate: 0 },
+        engineVotes: [{ engine: "FailingEngine", weight: 1 }],
       },
     }));
 

@@ -27,6 +27,9 @@ import {
 import { runParityConfluenceEngine } from "../precision-parity/engines/confluence-engine";
 import { runSignalDecayEngine } from "../precision-parity/engines/decay-engine";
 import { apexSimulator, type SimTrade } from "./simulator";
+
+/** Fixtures populate only the fields the effectiveness engines actually read. */
+const asTrades = (rows: unknown[]): SimTrade[] => rows as SimTrade[];
 import { evaluateExecutionReady } from "../sentinel/execution-ready";
 import { mapObservationStateToSignalLifecycle } from "../sentinel/signal-state";
 import { assessEntryClearance } from "../sentinel/entry-clearance";

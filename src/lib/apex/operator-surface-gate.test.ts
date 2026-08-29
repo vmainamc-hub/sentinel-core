@@ -10,7 +10,7 @@ import type { SimTrade } from "./simulator";
 
 describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
   it("strictly gates candidates and provides detailed reason logs", () => {
-    const mockOpportunity: RankedOpportunity = {
+    const mockOpportunity: any = {
       symbol: "R_100",
       name: "Volatility 100 Index",
       score: 45, // < 65 => should fail minScore
@@ -30,7 +30,7 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
       },
     };
 
-    const mockIntel: MarketIntel = {
+    const mockIntel: any = {
       symbol: "R_100",
       name: "Volatility 100 Index",
       ticks: 15, // < 20 STRUCTURAL_MIN_TICKS
@@ -77,7 +77,7 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
   });
 
   it("qualifies a clean candidate passing all 9 gates", () => {
-    const cleanOpp: RankedOpportunity = {
+    const cleanOpp: any = {
       symbol: "R_100",
       name: "Volatility 100 Index",
       score: 72,
@@ -91,13 +91,13 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
         danger: 25,
         streak: 0,
         theoretical: 0.9,
-        supports: [{ label: "Strong distribution deviation", engine: "Distribution", weight: 1.5 }],
+        supports: [{ label: "Strong distribution deviation", engine: "Distribution", weight: 1.5, detail: "Strong distribution deviation", n: 100 }],
         resists: [],
         contradictionCount: 0,
       },
     };
 
-    const cleanIntel: MarketIntel = {
+    const cleanIntel: any = {
       symbol: "R_100",
       name: "Volatility 100 Index",
       ticks: 120,
@@ -143,7 +143,7 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
   });
 
   it("scanNow returns empty top array when no candidate is qualified (no fallback to ranked[0])", () => {
-    const thinIntels: MarketIntel[] = [
+    const thinIntels: any[] = [
       {
         symbol: "R_10",
         name: "Volatility 10 Index",
@@ -177,7 +177,7 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
       resolvedAt: Date.now() - (30 - i) * 1000 + 500,
       symbol: "R_100",
       market: "Volatility 100 Index",
-      contract: "differs",
+      contract: "UNDER7",
       contractLabel: "Differs",
       side: "UNDER",
       barrier: 7,
@@ -193,7 +193,7 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
       payout: 0.38,
       pnl: 0.38,
       entryCondition: "DISTRIBUTION_EXTREME",
-      entryRule: "R1",
+      entryRule: null,
       invalidationReason: null,
       state: {
         opportunity: 80,
@@ -203,7 +203,20 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
         stability: 80,
         freshness: 100,
         danger: 20,
-        engineVotes: [{ engine: "Distribution", weight: 1.5 }],
+        dangerClearance: true,
+        regime: "BALANCED",
+        threatState: "CALM",
+        losingThreat: 0,
+        sensitiveConflict: false,
+        criticalDetail: "",
+        barState: "NORMAL",
+        mostIncreasing: null,
+        forwardState: "NONE",
+        agreement: "NEUTRAL",
+        modelState: "NONE",
+        reason: "",
+        simBefore: { n: 0, winRate: 0 },
+        simRecentBefore: { n: 0, winRate: 0 },
       },
     }));
 
@@ -218,7 +231,7 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
       resolvedAt: Date.now() - (30 - i) * 1000 + 500,
       symbol: "R_100",
       market: "Volatility 100 Index",
-      contract: "matches",
+      contract: "OVER2",
       contractLabel: "Matches",
       side: "OVER",
       barrier: 2,
@@ -234,7 +247,7 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
       payout: 0.9,
       pnl: -1,
       entryCondition: "FAILING_SETUP",
-      entryRule: "R2",
+      entryRule: null,
       invalidationReason: null,
       state: {
         opportunity: 40,
@@ -244,7 +257,20 @@ describe("Operator Surface Gate & Dormant Systems Integration Test", () => {
         stability: 30,
         freshness: 50,
         danger: 70,
-        engineVotes: [{ engine: "FailingEngine", weight: 1.0 }],
+        dangerClearance: false,
+        regime: "CHAOTIC",
+        threatState: "HOSTILE",
+        losingThreat: 70,
+        sensitiveConflict: true,
+        criticalDetail: "",
+        barState: "NORMAL",
+        mostIncreasing: null,
+        forwardState: "NONE",
+        agreement: "NEUTRAL",
+        modelState: "NONE",
+        reason: "",
+        simBefore: { n: 0, winRate: 0 },
+        simRecentBefore: { n: 0, winRate: 0 },
       },
     }));
 

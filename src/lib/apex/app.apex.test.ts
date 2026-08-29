@@ -46,11 +46,9 @@ describe("Apex & Sentinel Initialization & Rendering smoke test", () => {
 
     apexCore.retain();
     // Simulate derivBus delivering ticks for R_100
-    // @ts-expect-error test mock injection
     derivBus.setBuffer("R_100", ticks);
 
     // Call analyse on R_100
-    // @ts-expect-error test mock method
     apexCore.analyse("R_100");
 
     const intels = apexCore.getAll();
@@ -91,9 +89,7 @@ describe("Apex & Sentinel Initialization & Rendering smoke test", () => {
     }
 
     apexCore.retain();
-    // @ts-expect-error test mock injection
     derivBus.setBuffer("R_50", ticks);
-    // @ts-expect-error test mock method
     apexCore.analyse("R_50");
 
     const intels = apexCore.getAll();

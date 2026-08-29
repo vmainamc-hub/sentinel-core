@@ -114,7 +114,7 @@ export function BestOpportunityCard({
       contractType: c.side.toUpperCase(),
       barrier: c.barrier ?? "N/A",
       targetEntryDigit: d ? d.digit : "WAIT_FOR_TRIGGER",
-      entryTriggerTouch: item.entryTrigger?.touch ?? "ANY",
+      entryTriggerTouch: item.entryTrigger?.preferredTouch ?? "ANY",
       entryConfidence: item.entryPoint?.preferred ? Math.round(((item.entryPoint.preferred.pWin ?? 0) * 100)) : item.score,
       validityWindow: ep?.window?.label ?? "15-20 TICKS",
       validityWindowKind: ep?.window?.kind ?? "DYNAMIC",
@@ -469,7 +469,7 @@ export function BestOpportunityCard({
                 <div>
                   Runner-up Digit:{" "}
                   <span className="text-foreground">
-                    {ep?.runnerUp ? `Digit ${ep.runnerUp.digit} (${(ep.runnerUp.score ?? 0).toFixed(0)}/100)` : "NONE"}
+                    {ep?.runnerUpDigit != null ? `Digit ${ep.runnerUpDigit} (${(ep.runnerUpScore ?? 0).toFixed(0)}/100)` : "NONE"}
                   </span>
                 </div>
                 <div>
@@ -491,9 +491,9 @@ export function BestOpportunityCard({
           </div>
           <div className="mt-1 flex items-baseline justify-between">
             <div className="font-mono text-xl font-bold text-foreground">
-              {item.entryTrigger?.touch === "FIRST_TOUCH"
+              {item.entryTrigger?.preferredTouch === "FIRST"
                 ? "1ST TOUCH (AFTER ABSENCE)"
-                : item.entryTrigger?.touch === "SUBSEQUENT_TOUCH"
+                : item.entryTrigger?.preferredTouch === "SUBSEQUENT"
                   ? "SUBSEQUENT TOUCH (CLUSTER)"
                   : "ANY DIGIT PRINT"}
             </div>
@@ -508,21 +508,23 @@ export function BestOpportunityCard({
             <div>
               Trigger Confidence:{" "}
               <span className="text-foreground">
-                {item.entryTrigger ? `${item.entryTrigger.confidence}/100` : "NOT AVAILABLE"}
+                {item.entryTrigger
+                  ? `${item.entryTrigger.preferredTouch === "SUBSEQUENT" ? item.entryTrigger.subsequent.stability : item.entryTrigger.first.stability}/100`
+                  : "NOT AVAILABLE"}
               </span>
             </div>
             <div>
               Skip Next Touch:{" "}
               <span
                 style={{
-                  color: item.entryTrigger?.skipNextTouch ? "var(--bear)" : "var(--bull)",
+                  color: item.entryTrigger?.nextTouchAligned === false ? "var(--bear)" : "var(--bull)",
                 }}
               >
-                {item.entryTrigger?.skipNextTouch ? "YES — SKIP 1ST PRINT" : "NO — ENTER NEXT PRINT"}
+                {item.entryTrigger?.nextTouchAligned === false ? "YES — SKIP 1ST PRINT" : "NO — ENTER NEXT PRINT"}
               </span>
             </div>
             <p className="mt-1 text-[10px] text-muted-foreground leading-tight">
-              {item.entryTrigger?.reason ?? "Enter on next valid digit print."}
+              {item.entryTrigger?.instruction ?? "Enter on next valid digit print."}
             </p>
           </div>
         </div>
@@ -567,7 +569,7 @@ export function BestOpportunityCard({
             </div>
             <div>
               Observed Sequences:{" "}
-              <span className="text-foreground">{surv?.sampleSize ?? 0}</span>
+              <span className="text-foreground">{surv?.sequences ?? 0}</span>
             </div>
             <p className="mt-1 text-[10px] text-muted-foreground leading-tight">
               {surv?.summary ?? "Post-entry survival analysis requires validated entry digit sample."}
@@ -587,7 +589,7 @@ export function BestOpportunityCard({
                 color:
                   item.digitPsychology?.verdict === "SUPPORT"
                     ? "var(--bull)"
-                    : item.digitPsychology?.verdict === "HOSTILE"
+                    : item.digitPsychology?.verdict === "CONFLICT"
                       ? "var(--bear)"
                       : "var(--neon)",
               }}
@@ -610,15 +612,15 @@ export function BestOpportunityCard({
               <span className="text-bear font-semibold">
                 [{item.digitPsychology?.losingZone?.join(", ") ?? "—"}]
               </span>{" "}
-              · Boundary: {item.digitPsychology?.boundaryDigit ?? "—"}
+              · Boundary: {item.digitPsychology?.boundary?.join(", ") || "—"}
             </div>
             <div>
-              Dominant Greens: {item.digitPsychology?.greenDigits?.join(", ") || "—"} · Reds:{" "}
-              {item.digitPsychology?.redDigits?.join(", ") || "—"}
+              Dominant Greens: {[item.digitState?.green, item.digitState?.secondGreen].filter((v): v is number => v != null).join(", ") || "—"} · Reds:{" "}
+              {[item.digitState?.red, item.digitState?.secondRed].filter((v): v is number => v != null).join(", ") || "—"}
             </div>
             <div>
-              Shifting: ↑ Digit {item.digitPsychology?.mostIncreasingDigit ?? "—"} · ↓ Digit{" "}
-              {item.digitPsychology?.mostDecreasingDigit ?? "—"}
+              Shifting: ↑ Digit {item.digitState?.mostIncreasing ?? "—"} · ↓ Digit{" "}
+              {item.digitState?.mostDecreasing ?? "—"}
             </div>
           </div>
         </div>
@@ -635,21 +637,21 @@ export function BestOpportunityCard({
             <div>
               120t Trend:{" "}
               <span className="text-foreground">
-                {item.priceAction?.sideTrend ?? "FLAT"} ({typeof item.priceAction?.sideNetGain === "number" ? ((item.priceAction.sideNetGain > 0 ? "+" : "") + item.priceAction.sideNetGain.toFixed(1) + "%") : "0%"})
+                {item.priceAction?.winningSide?.direction ?? "STABLE"} ({typeof item.priceAction?.winningSide?.rateOfChangePp === "number" ? ((item.priceAction.winningSide.rateOfChangePp > 0 ? "+" : "") + item.priceAction.winningSide.rateOfChangePp.toFixed(1) + "%") : "0%"})
               </span>
             </div>
             <div>
               Takeover State:{" "}
               <span
                 style={{
-                  color: item.priceAction?.losingTakeover ? "var(--bear)" : "var(--bull)",
+                  color: item.priceAction?.takeover && item.priceAction.takeover.state !== "NO TAKEOVER" ? "var(--bear)" : "var(--bull)",
                 }}
               >
-                {item.priceAction?.losingTakeover ? "LOSING SIDE TAKEOVER" : "WINNING SIDE CONTROL"}
+                {item.priceAction?.takeover?.state ?? "NO TAKEOVER"}
               </span>
             </div>
             <div>
-              Consensus: 15t({item.intel.pressure?.window15?.winner ?? "—"}) · 30t({item.intel.pressure?.window30?.winner ?? "—"}) · 60t({item.intel.pressure?.window60?.winner ?? "—"}) · 120t({item.intel.pressure?.window120?.winner ?? "—"})
+              {item.priceActionField?.summary ?? "Multi-window pressure summary unavailable."}
             </div>
           </div>
         </div>
@@ -664,30 +666,30 @@ export function BestOpportunityCard({
               className="text-lg font-bold"
               style={{
                 color:
-                  (c.losingSidePressure?.index ?? item.losingSidePressure?.index ?? 0) > 40
+                  (c.losingSidePressure?.index ?? 0) > 40
                     ? "var(--bear)"
                     : "var(--bull)",
               }}
             >
-              {(c.losingSidePressure?.state ?? item.losingSidePressure?.state ?? "CALM")} ({((c.losingSidePressure?.index ?? item.losingSidePressure?.index ?? 0)).toFixed(0)}/100)
+              {(c.losingSidePressure?.state ?? "CALM")} ({((c.losingSidePressure?.index ?? 0)).toFixed(0)}/100)
             </span>
             <span className="text-xs text-muted-foreground">
-              Modifier: ×{((c.losingSidePressure?.modifier ?? item.losingSidePressure?.modifier ?? 1)).toFixed(3)}
+              Modifier: ×{((c.losingSidePressure?.modifier ?? 1)).toFixed(3)}
             </span>
           </div>
           <div className="mt-2 space-y-1 font-mono text-[10px] text-muted-foreground">
             <div>
               Penalty Applied:{" "}
-              <span className="text-bear">{c.losingSidePressure?.penaltyPoints ?? item.losingSidePressure?.penaltyPoints ?? 0} pts</span>
+              <span className="text-bear">{c.losingSidePressure?.penaltyPoints ?? 0} pts</span>
             </div>
             <div>
               Rising Losers:{" "}
               <span className="text-foreground">
-                {c.losingSidePressure?.risingLosersCount ?? item.losingSidePressure?.risingLosersCount ?? 0} losing digits climbing
+                {c.losingSidePressure?.risingCount ?? 0} losing digits climbing
               </span>
             </div>
             <p className="mt-1 text-[10px] text-muted-foreground leading-tight">
-              {c.losingSidePressure?.summary ?? item.losingSidePressure?.summary ?? "Losing digits remain suppressed."}
+              {c.losingSidePressure?.reason ?? "Losing digits remain suppressed."}
             </p>
           </div>
         </div>
@@ -708,7 +710,7 @@ export function BestOpportunityCard({
               Exact Combo:{" "}
               <span className="text-foreground">
                 {item.combination
-                  ? `${(((item.combination.weightedWinRate ?? item.combination.winRate ?? 0)) * 100).toFixed(1)}% (N=${item.combination.n ?? 0}, Exp ${(item.combination.weightedExpectancy ?? item.combination.expectancy ?? 0).toFixed(2)})`
+                  ? `${(((item.combination.exact.weightedWinRate ?? item.combination.exact.winRate ?? 0)) * 100).toFixed(1)}% (N=${item.combination.exact.n ?? 0}, Exp ${(item.combination.exact.weightedExpectancy ?? item.combination.exact.expectancy ?? 0).toFixed(2)})`
                   : "NO COMBO DATA"}
               </span>
             </div>

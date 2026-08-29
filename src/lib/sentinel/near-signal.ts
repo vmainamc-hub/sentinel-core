@@ -46,7 +46,7 @@ export class NearSignalEngine {
     const isExecutionReady = Boolean(candidate.executionReady);
     const danger = candidate.dangerComposition?.total ?? candidate.contract.danger ?? 0;
     const isGateQualified = Boolean(
-      (candidate.clearance?.state === "CLEARED" || candidate.entryClearance?.verdict === "CLEARED") &&
+      (candidate.clearance?.state === "CLEAR" || candidate.entryClearance?.verdict === "CLEARED") &&
       !candidate.blocked &&
       candidate.score >= OPERATOR_SURFACE_THRESHOLDS.minScore &&
       danger <= OPERATOR_SURFACE_THRESHOLDS.maxDanger
@@ -69,14 +69,14 @@ export class NearSignalEngine {
     const isVetoed = Boolean(
       candidate.blocked ||
       candidate.clearance?.state === "BLOCKED" ||
-      candidate.vetoResolution?.hasVeto ||
-      candidate.governance?.allowTrade === false ||
-      candidate.veto?.hard
+      candidate.vetoResolution?.isBlocked ||
+      candidate.governance?.vetoed === true ||
+      candidate.priceAction?.veto
     );
     const sampleSize = candidate.contract.n || candidate.intel?.ticks || 0;
     const isThinSample = sampleSize < OPERATOR_SURFACE_THRESHOLDS.minTicks;
     const hasMajorContradictions = (candidate.contract.contradiction ?? 0) > OPERATOR_SURFACE_THRESHOLDS.maxContradiction || (candidate.contract.conflicts?.length ?? 0) > 2;
-    const isBrokenDirection = candidate.direction?.state === "OPPOSED" || candidate.direction?.broken === true;
+    const isBrokenDirection = candidate.direction?.label === "AGAINST";
     const isHostileRegime = candidate.contract.regimeCompatible === false || candidate.contract.fakeEdge?.verdict === "REJECTED";
     const isCircuitBreakerTripped = candidate.finalDecision?.circuitBreaker?.tripped === true;
 
@@ -131,11 +131,10 @@ export class NearSignalEngine {
     let hasScoreBaseline = false;
 
     // A. Structural Direction Alignment
-    const directionSide = candidate.direction?.direction ?? candidate.intel?.pressure?.bias;
     const contractSide = candidate.contract.side;
-    if (directionSide === contractSide && candidate.direction?.state !== "WEAK") {
+    if (candidate.direction && candidate.direction.label !== "AGAINST" && candidate.direction.label !== "WEAK") {
       hasDirectionConviction = true;
-      strengths.push(`Direction: ${contractSide} supported by 1,000-tick spine (${candidate.direction?.state ?? "CONFIRMED"})`);
+      strengths.push(`Direction: ${contractSide} supported by 1,000-tick spine (${candidate.direction?.label ?? "CONFIRMED"})`);
       factors.push({
         code: "NS_DIRECTION",
         label: "Directional Spine Alignment",
@@ -167,8 +166,8 @@ export class NearSignalEngine {
     }
 
     // C. Lower-Timeframe Pressure
-    const confirmsStructure = candidate.priceAction?.confirmsStructure !== false;
-    const noPressureThreat = candidate.priceAction?.losingSidePressure?.state !== "ACTIVE_THREAT";
+    const confirmsStructure = candidate.priceAction?.alignment !== "CONTRADICTING" && candidate.priceAction?.alignment !== "TAKEOVER";
+    const noPressureThreat = candidate.priceAction?.takeover?.state !== "CONFIRMED TAKEOVER";
     if (confirmsStructure && noPressureThreat) {
       hasPressureConviction = true;
       strengths.push("Pressure: Lower-timeframe (120-tick) pressure confirms structure");
@@ -209,10 +208,10 @@ export class NearSignalEngine {
     if (candidate.finalDecision?.verdict === "HELD_EXPOSURE_CAP") {
       missingConditions.push("Stage 4 portfolio exposure ceiling reached for correlation group");
     }
-    if (candidate.entryPoint?.status === "WAIT") {
+    if (candidate.entryPoint?.status === "NOT_READY") {
       missingConditions.push("Entry trigger touch not yet confirmed on preferred digit");
     }
-    if (candidate.signal?.state === "VALID_WAIT_ENTRY" || candidate.signal?.waitForEntry) {
+    if (candidate.signal?.waitForEntry) {
       missingConditions.push("Awaiting valid entry timing window");
     }
     if (candidate.entryClearance?.verdict === "WAIT") {

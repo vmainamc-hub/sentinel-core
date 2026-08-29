@@ -12,7 +12,7 @@ type Trade = {
   contract_id: string | null;
   symbol: string;
   contract_type: string;
-  stake: number;
+  stake: number | null;
   payout: number | null;
   profit: number | null;
   status: string;

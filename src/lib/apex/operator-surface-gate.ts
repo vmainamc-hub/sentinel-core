@@ -3,7 +3,7 @@
 // 90 cells remain continuously observed in the internal universe, but the operator surface requires all 9 gates.
 
 import type { MarketIntel, RankedOpportunity } from "./types";
-import type { OpportunityAlert } from "./opportunity-alert";
+import type { AlertSnapshot } from "../sentinel/opportunity-alert";
 import { OPERATOR_SURFACE_THRESHOLDS, type OperatorSurfaceThresholds } from "./operator-surface-thresholds";
 
 export const STRUCTURAL_MIN_TICKS = OPERATOR_SURFACE_THRESHOLDS.minTicks;
@@ -36,7 +36,7 @@ export interface OperatorSurfaceGateResult {
 }
 
 export function operatorSurfaceGate(
-  candidate: RankedOpportunity | OpportunityAlert | any,
+  candidate: RankedOpportunity | AlertSnapshot | any,
   intel?: MarketIntel | any,
   options?: OperatorSurfaceGateOptions,
 ): OperatorSurfaceGateResult {

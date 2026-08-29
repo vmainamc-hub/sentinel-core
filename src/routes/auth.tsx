@@ -4,7 +4,7 @@ import { z } from "zod";
 import { Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,15 +89,14 @@ function AuthPage() {
     setBusy(true);
     try {
       sessionStorage.setItem("auth:next", next);
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
       });
-      if ("error" in result && result.error) {
+      if (error) {
         toast.error("Google sign-in failed");
         return;
       }
-      if ("redirected" in result && result.redirected) return;
-      void navigate({ to: next, replace: true });
     } finally {
       setBusy(false);
     }

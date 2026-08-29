@@ -126,52 +126,90 @@ function createControlledRankedCandidate(params: {
     invalidation: [],
     recent: null,
     clearance: {
-      state: "CLEARED",
-      score: params.score,
-      reason: "",
-      threat: "LOW",
-      maxDanger: 65,
-      rules: [],
+      state: "CLEAR",
+      risk: 0,
+      reasons: [],
+      blockers: [],
+      cautions: [],
+      instability: { score: 5, label: "CALM", drivers: [] },
+      summary: "Clearance CLEAR.",
+      executable: true,
     },
     evidence: {
+      status: "STRONG",
       confidence: 85,
-      band: "HIGH",
-      weight: 1,
-      n: 1000,
-      summary: "High confidence evidence",
+      uncertainty: 10,
+      authority: 1,
+      codes: [],
+      note: "High confidence evidence",
     },
     blocked: false,
     direction: {
-      direction: side,
-      side,
-      strength: 80,
       score: 80,
-      state: "CONFIRMED",
-      label: side,
-      agreement: "SUPPORT",
+      confidence: 82,
+      label: "STRONG",
       votes: [],
+      supporting: [],
+      opposing: [],
+      disagreement: 0,
+      disagreementPenalty: 0,
+      summary: `Direction 80/100 (STRONG) for ${side}.`,
     },
     dangerComposition: {
       total: dangerVal,
       level: "LOW",
-      isHardBlocked: false,
-      structural: 5,
-      volatility: 5,
-      liquidity: 5,
-      streak: 0,
+      components: [],
+      autoBlock: [],
+      severe: [],
       summary: "Low danger",
+      overallDangerScore: dangerVal,
+      isHardBlocked: false,
+      dangerFactor: dangerVal / 100,
     },
     setup: {
       score: params.score,
-      grade: "A",
+      grade: "PRIME",
+      confidence: 85,
+      sampleSize: 1000,
+      recentSampleSize: 100,
+      direction: {
+        score: 80,
+        confidence: 82,
+        label: "STRONG",
+        votes: [],
+        supporting: [],
+        opposing: [],
+        disagreement: 0,
+        disagreementPenalty: 0,
+        summary: `Direction 80/100 (STRONG) for ${side}.`,
+      },
+      danger: {
+        total: dangerVal,
+        level: "LOW",
+        components: [],
+        autoBlock: [],
+        severe: [],
+        summary: "Low danger",
+        overallDangerScore: dangerVal,
+        isHardBlocked: false,
+        dangerFactor: dangerVal / 100,
+      },
       factors: [],
-      strengths: [],
-      weaknesses: [],
+      autoBlocked: false,
+      summary: "SETUP PRIME",
     },
     entryClearance: {
       verdict: "CLEARED",
-      score: params.score,
+      confidence: 85,
       requirements: [],
+      unmet: [],
+      blockers: [],
+      waiting: [],
+      combination: {} as any,
+      bestEntryCondition: null,
+      autoBlock: [],
+      executable: true,
+      summary: "CLEARED",
     },
     combination: {} as any,
     relative: {
@@ -186,13 +224,13 @@ function createControlledRankedCandidate(params: {
     } as any,
     entryPoint: {
       status: "ARMED",
-      preferred: { digit: winners[0] ?? 7, winRate: 0.72, lowerBound: 0.68 },
+      preferred: { digit: winners[0] ?? 7, pWin: 0.72, pWinLower: 0.68 } as any,
       window: { label: "12 ticks", value: 12, basis: "empirical" },
       invalidation: [],
       confidence: 75,
     } as any,
     survival: null,
-    survivalInfluence: { factor: 1, delta: 0, label: "NEUTRAL" },
+    survivalInfluence: { points: 0, label: "NOT APPLICABLE", detail: "No validated entry digit.", sufficient: false, fragile: false },
     entryTrigger: null,
     signal: {
       state: "VALID_ENTRY_ARMED",
@@ -239,10 +277,22 @@ function createControlledRankedCandidate(params: {
       alignment: "CONFIRMED",
       losingSidePressure: { state: "SAFE", index: 15, modifier: 1.0 },
     } as any,
+    priceActionField: {} as any,
+    operatorSpecial: {} as any,
+    convergence: {} as any,
     executionReady: true,
     executionReadyReasons: [],
     finalDecision: finalDecision as any,
-    recommendedStake: 1.0,
+    recommendedStake: {
+      baseStake: 1.0,
+      drawdownAdjustedStake: 1.0,
+      kellyFraction: 0.02,
+      maxBankrollPct: 2,
+      maturityFactor: 1,
+      confidenceFactor: 1,
+      factors: [],
+      summary: "Base stake 1.0",
+    },
   };
 }
 
@@ -313,7 +363,7 @@ function createMockContracts(marketId: string, biasDigit: number, baseDanger: nu
       confidence: 82,
       opportunity: 78,
       phase: "MATURE",
-      supports: [{ engine: "Distribution", label: "Strong positive bias", weight: 1.5 }],
+      supports: [{ engine: "Distribution", label: "Strong positive bias", detail: "Strong positive bias observed", weight: 1.5, n: 1000 }],
       conflicts: [],
       contradiction: 0,
       ageTicks: 1000,
@@ -356,67 +406,54 @@ function createMockMarket(symbol: string, name: string, biasDigit: number = 7, t
     ticks: tickCount,
     lastTickAt: Date.now() - 500,
     ageMs: 500,
-    digits,
     contracts,
     best: contracts[0],
     stats: {
-      total: tickCount,
-      counts: pcts.map((p) => Math.round(p * tickCount)),
+      n: tickCount,
+      freq: pcts.map((p) => Math.round(p * tickCount)),
       pct: pcts,
+      midPct: pcts,
       recentPct: pcts,
+      microPct: pcts,
+      z: pcts.map(() => 0),
+      lastDigit: biasDigit,
       dominant: biasDigit,
-      least: (biasDigit + 5) % 10,
-      entropy: 0.85,
-      evenPct: 0.5,
-      oddPct: 0.5,
-      highPct: biasDigit >= 5 ? 0.65 : 0.35,
-      lowPct: biasDigit < 5 ? 0.65 : 0.35,
+      suppressed: (biasDigit + 5) % 10,
     },
     pressure: {
-      window15: { winner: "OVER", overPct: 0.65, underPct: 0.35, net: 0.3 },
-      window30: { winner: "OVER", overPct: 0.62, underPct: 0.38, net: 0.24 },
-      window60: { winner: "OVER", overPct: 0.60, underPct: 0.40, net: 0.20 },
-      window120: { winner: "OVER", overPct: 0.58, underPct: 0.42, net: 0.16 },
-      trend: "OVER",
-      bias: "OVER",
-      velocity: 0.15,
-      acceleration: 0.05,
-      net: 0.22,
+      pressure: Array(10).fill(0),
+      impulse: Array(10).fill(0),
+      lifecycle: Array(10).fill("neutral"),
+      exhaustion: Array(10).fill(0),
+      zoneAShare: 0.5,
+      zoneBShare: 0.5,
+      migration: 0.1,
     },
     transition: null,
     sequence: null,
     entropy: {
       entropy: 0.82,
-      maxEntropy: 1.0,
-      normalized: 0.82,
-      regime: "TRENDING",
-      isUniform: false,
+      chi2: 5,
+      uniformityFail: false,
     },
     anomaly: null,
     volatility: {
+      base: 0.1,
+      recent: 0.105,
       ratio: 1.05,
-      state: "NORMAL",
-      stdev: 0.12,
-      mean: 0.1,
+      label: "normal",
     },
     trend: null,
     regime: {
-      id: "TRENDING",
       label: "TRENDING",
       confidence: 85,
-      sampleSize: tickCount,
-      stability: 90,
-      summary: "Stable directional trend detected.",
+      detail: "Stable directional trend detected.",
     },
     personality: null,
     buildup: null,
     quality: {
-      overallScore: 82,
-      grade: "A",
-      liquidity: 90,
-      stability: 85,
-      signalToNoise: 80,
-      summary: "High quality streaming data.",
+      score: 82,
+      detail: "High quality streaming data.",
     },
     danger: 15,
     updatedAt: Date.now(),
@@ -428,9 +465,15 @@ function createMockMarket(symbol: string, name: string, biasDigit: number = 7, t
     psychology: null,
     specialDigits: null,
     fluctuation: {
+      n: 30,
       score: 18,
       state: "CALM",
-      flickerRate: 0.02,
+      signalFlickerRate: 0.02,
+      edgeSignFlipRate: 0.01,
+      confidenceOscillation: 1,
+      psychologyFlipRate: 0.01,
+      rankChurn: 0.01,
+      drivers: [],
       summary: "Calm market environment with low noise.",
     },
   };
@@ -479,8 +522,8 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
     if (candidate.entryPoint.preferred) {
       expect(candidate.entryPoint.preferred.digit).toBeGreaterThanOrEqual(0);
       expect(candidate.entryPoint.preferred.digit).toBeLessThanOrEqual(9);
-      expect(candidate.entryPoint.preferred.winRate).toBeGreaterThan(0);
-      expect(candidate.entryPoint.preferred.lowerBound).toBeLessThanOrEqual(candidate.entryPoint.preferred.winRate);
+      expect(candidate.entryPoint.preferred.pWin).toBeGreaterThan(0);
+      expect(candidate.entryPoint.preferred.pWinLower).toBeLessThanOrEqual(candidate.entryPoint.preferred.pWin);
     }
   });
 
@@ -533,15 +576,15 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
     const candidate = scan.bestOf90!.candidate;
     expect(candidate.priceAction).toBeDefined();
     expect(candidate.priceAction.alignment).toBeDefined();
-    expect(candidate.intel.pressure?.window15).toBeDefined();
-    expect(candidate.intel.pressure?.window120).toBeDefined();
+    expect(candidate.intel.pressure?.pressure).toBeDefined();
+    expect(candidate.intel.pressure?.migration).toBeDefined();
   });
 
   // TEST 9 — LOSING-SIDE PRESSURE
   it("TEST 9: losing side pressure is computed with index, modifier and state", () => {
     const scan = scanNow(mockMarkets, DEFAULT_SCAN_OPTIONS);
     const candidate = scan.bestOf90!.candidate;
-    const lsp = candidate.losingSidePressure ?? candidate.contract.losingSidePressure;
+    const lsp = candidate.contract.losingSidePressure;
     expect(lsp).toBeDefined();
     if (lsp) {
       expect(lsp.index).toBeGreaterThanOrEqual(0);
@@ -589,7 +632,7 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
     // Candidate A: raw Stage-3 score = 95, Stage-4 verdict = HELD
     const candidateA = createControlledRankedCandidate({
       symbol: "R_100",
-      contractId: "OVER_2",
+      contractId: "OVER2",
       score: 95,
       stage4Verdict: "HELD_UNCONFIRMED_SIGNIFICANCE",
       danger: 12,
@@ -600,7 +643,7 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
     // Candidate B: raw Stage-3 score = 91, Stage-4 verdict = CLEARED
     const candidateB = createControlledRankedCandidate({
       symbol: "R_75",
-      contractId: "UNDER_7",
+      contractId: "UNDER7",
       score: 91,
       stage4Verdict: "CLEARED",
       danger: 15,
@@ -611,7 +654,7 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
     // Candidate C: raw Stage-3 score = 87, Stage-4 verdict = CLEARED
     const candidateC = createControlledRankedCandidate({
       symbol: "R_50",
-      contractId: "OVER_3",
+      contractId: "OVER3",
       score: 87,
       stage4Verdict: "CLEARED",
       danger: 18,
@@ -667,7 +710,7 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
     // Candidate A: raw score = 95, Stage-4 = CLEARED
     const candidateA = createControlledRankedCandidate({
       symbol: "R_100",
-      contractId: "OVER_2",
+      contractId: "OVER2",
       score: 95,
       stage4Verdict: "CLEARED",
       danger: 12,
@@ -676,7 +719,7 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
     // Candidate B: raw score = 91, Stage-4 = CLEARED
     const candidateB = createControlledRankedCandidate({
       symbol: "R_75",
-      contractId: "UNDER_7",
+      contractId: "UNDER7",
       score: 91,
       stage4Verdict: "CLEARED",
       danger: 15,
@@ -697,14 +740,14 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
   it("TEST 15: When no candidate in the population is Stage-4-cleared, Best-of-90 honestly reports non-qualified status with exact blockers", () => {
     const candidateA = createControlledRankedCandidate({
       symbol: "R_100",
-      contractId: "OVER_2",
+      contractId: "OVER2",
       score: 95,
       stage4Verdict: "HELD_UNCONFIRMED_SIGNIFICANCE",
       danger: 12,
     });
     const candidateB = createControlledRankedCandidate({
       symbol: "R_75",
-      contractId: "UNDER_7",
+      contractId: "UNDER7",
       score: 91,
       stage4Verdict: "HELD_EXPOSURE_CAP",
       danger: 15,
@@ -724,14 +767,14 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
     // 1. Candidate with supportive digit psychology but remaining execution wait
     const supportiveCandidate = createControlledRankedCandidate({
       symbol: "R_100",
-      contractId: "OVER_2",
+      contractId: "OVER2",
       score: 82,
       stage4Verdict: "HELD_UNCONFIRMED_SIGNIFICANCE",
       danger: 15,
       digitPsychologyVerdict: "SUPPORT",
       digitPsychologyScore: 78,
     });
-    supportiveCandidate.entryPoint.status = "WAIT";
+    supportiveCandidate.entryPoint.status = "UNVALIDATED";
     supportiveCandidate.executionReady = false;
     supportiveCandidate.executionReadyReasons = ["Entry trigger touch not yet confirmed on preferred digit"];
 
@@ -744,14 +787,14 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
     // 2. Candidate with conflicting digit psychology (cannot qualify as Near-Signal)
     const conflictingCandidate = createControlledRankedCandidate({
       symbol: "R_100",
-      contractId: "OVER_2",
+      contractId: "OVER2",
       score: 82,
       stage4Verdict: "HELD_UNCONFIRMED_SIGNIFICANCE",
       danger: 15,
       digitPsychologyVerdict: "CONFLICT",
       digitPsychologyScore: 30,
     });
-    conflictingCandidate.entryPoint.status = "WAIT";
+    conflictingCandidate.entryPoint.status = "UNVALIDATED";
     conflictingCandidate.executionReady = false;
 
     const evalConflicting = NearSignalEngine.evaluate(conflictingCandidate);
@@ -762,7 +805,7 @@ describe("Best-of-90 Full Signal Hydration & Authoritative Presentation", () => 
     // 3. Candidate with hard-blocked digit psychology
     const hardBlockedCandidate = createControlledRankedCandidate({
       symbol: "R_100",
-      contractId: "OVER_2",
+      contractId: "OVER2",
       score: 82,
       stage4Verdict: "HELD_UNCONFIRMED_SIGNIFICANCE",
       danger: 15,

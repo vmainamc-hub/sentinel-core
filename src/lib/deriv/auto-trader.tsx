@@ -128,11 +128,12 @@ export function AutoTraderProvider({ children }: { children: ReactNode }) {
       since.setHours(0, 0, 0, 0);
       const { data } = await supabase
         .from("trades")
-        .select("profit")
+        .select("profit, meta")
         .eq("user_id", userData.user.id)
-        .eq("auto_trade", true)
         .gte("purchased_at", since.toISOString());
-      const sum = (data ?? []).reduce((s: number, r: any) => s + (Number(r.profit) || 0), 0);
+      const sum = (data ?? [])
+        .filter((r: any) => r?.meta?.auto_trade === true)
+        .reduce((s: number, r: any) => s + (Number(r.profit) || 0), 0);
       setDailyPL(sum);
     })();
   }, [logs.length]);

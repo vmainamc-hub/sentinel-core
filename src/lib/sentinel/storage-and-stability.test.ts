@@ -55,34 +55,42 @@ describe("Storage Fallback & Stability Subsystem", () => {
     const adapter = new SupabasePersistenceAdapter();
 
     const mockDossier: ObservationDossier = {
-      cellId: "R_100__MATCHES_DIFFERS",
+      cellId: "R_100__OVER2",
       marketId: "R_100",
-      proposition: "MATCHES_DIFFERS",
+      proposition: "OVER2",
       state: "RIPE",
       score: 85,
       isRipe: true,
       observationAge: 50,
       currentStateSince: 10,
       stability: "STABLE",
-      psychology: "DIGIT_ATTRACTOR",
-      entryDigit: 4,
-      pressure: 70,
-      losingSidePressure: 20,
-      danger: 15,
-      simulation: "DEVELOPING",
-      regime: "TRENDING",
-      momentum: "POSITIVE",
-      momentumRelation: "CONVERGENT",
-      trigger: "TRIGGER_ACTIVE",
-      veto: "CLEAR",
-      statistics: "STRONG",
-      hiddenBehavior: "NONE",
+      psychology: { direction: "OVER", state: "COHERENT", support: "SUPPORTING" },
+      entryDigit: { digit: 4, state: "VALIDATED", support: "SUPPORTING", dangerousCompetitor: false },
+      pressure: {
+        byWindow: { 15: "SUPPORTING", 30: "SUPPORTING", 60: "SUPPORTING", 120: "SUPPORTING" },
+        candidateDigitTrend: "TREND",
+      },
+      losingSidePressure: { state: "CALM", severity: "NONE" },
+      danger: { total: 15, level: "LOW", isHardBlocked: false, components: [], summary: "Calm" },
+      simulation: { state: "FAVOURABLE", sampleSize: 50, conditionedOnRegime: true },
+      regime: {
+        classification: "TRENDING_PERSISTENT",
+        confidence: 0.85,
+        transitioning: false,
+        compatibility: "COMPATIBLE",
+      },
+      momentum: { side: "OVER", state: "ACCELERATING", strength: 0.7 },
+      momentumRelation: "SUPPORTIVE",
+      trigger: { state: "VALID" },
+      veto: { active: false, hard: false },
+      statistics: { strength: "STRONG", sampleSize: 100 },
+      hiddenBehavior: { state: "NONE" },
       contradictions: 0,
       supportingEvidence: ["ev1", "ev2", "ev3", "ev4", "ev5", "ev6", "ev7"],
       opposingEvidence: [],
-      formationVelocity: "FAST",
-      evidenceMaturity: "MATURE",
-      tickConfirmation: "CONFIRMED",
+      formationVelocity: "RAPID",
+      evidenceMaturity: "HIGH",
+      tickConfirmation: { state: "CONFIRMED", ratio: 0.9, sampleSize: 20, windowSize: 20 },
       assessment: "READY",
       // Heavy context payload that should NOT be serialized into local storage
       marketContext: { hugeArray: new Array(1000).fill("huge_data") },
@@ -90,14 +98,14 @@ describe("Storage Fallback & Stability Subsystem", () => {
     };
 
     await adapter.saveDossierSnapshot(mockDossier);
-    const loaded = await adapter.loadDossier("R_100__MATCHES_DIFFERS");
+    const loaded = await adapter.loadDossier("R_100__OVER2");
     expect(loaded).toBeDefined();
     expect(loaded?.score).toBe(85);
     expect(loaded?.supportingEvidence?.length).toBeLessThanOrEqual(5);
 
     // Append 50 events to single cell, adapter should cap to MAX_STORED_EVENTS_PER_CELL (20)
     for (let i = 0; i < 50; i++) {
-      await adapter.appendEvent("R_100__MATCHES_DIFFERS", {
+      await adapter.appendEvent("R_100__OVER2", {
         timestamp: Date.now() + i,
         from: "WATCHING",
         to: "DEVELOPING",
@@ -105,7 +113,7 @@ describe("Storage Fallback & Stability Subsystem", () => {
       });
     }
 
-    const recent = await adapter.loadRecentEvents("R_100__MATCHES_DIFFERS", 50);
+    const recent = await adapter.loadRecentEvents("R_100__OVER2", 50);
     expect(recent.length).toBeLessThanOrEqual(20);
   });
 
@@ -114,7 +122,7 @@ describe("Storage Fallback & Stability Subsystem", () => {
       observationPersistence.logEvent({
         timestamp: Date.now() + i,
         market: "R_100",
-        contract: "MATCHES_DIFFERS",
+        contract: "OVER_2",
         from_state: "WATCHING",
         to_state: "DEVELOPING",
         reason: `evt_${i}`,
@@ -124,7 +132,7 @@ describe("Storage Fallback & Stability Subsystem", () => {
       });
     }
 
-    const events = observationPersistence.getEvents("R_100", "MATCHES_DIFFERS", 500);
+    const events = observationPersistence.getEvents("R_100", "OVER_2", 500);
     expect(events.length).toBeLessThanOrEqual(100);
   });
 

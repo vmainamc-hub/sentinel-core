@@ -174,8 +174,8 @@ export class FinalDecisionEngine {
         empiricalWinRate = r.contract.empirical > 0 ? r.contract.empirical * 100 : r.contract.theoretical * 100;
         if (r.simulator && r.simulator.n >= 10 && r.simulator.winRate > 0) {
           empiricalWinRate = r.simulator.winRate * 100;
-        } else if (r.survival?.sufficient && (r.survival.run1WinRate ?? 0) > 0) {
-          empiricalWinRate = r.survival.run1WinRate! * 100;
+        } else if (r.survival?.sufficient && (r.survival.perRun[0]?.winRate ?? 0) > 0) {
+          empiricalWinRate = r.survival.perRun[0].winRate * 100;
         }
         payout = r.contract.theoretical > 0 ? Number((0.97 / r.contract.theoretical).toFixed(2)) : 0;
         sampleTicks = r.contract.n || r.intel?.ticks || 0;

@@ -1175,7 +1175,6 @@ describe("Sentinel Observation Layer — §20 Consolidated Master Test Suite", (
       price += (Math.random() - 0.49) * 0.5;
       ticks.push({ t: nowMs - 500000 + i * 1000, price });
     }
-    // @ts-expect-error test mock injection
     derivBus.setBuffer("1HZ10V", ticks);
 
     const mockIntel: any = {
@@ -1241,7 +1240,6 @@ describe("Sentinel Observation Layer — §20 Consolidated Master Test Suite", (
       price += (Math.random() - 0.49) * 0.5;
       ticks.push({ t: nowMs - 500000 + i * 1000, price });
     }
-    // @ts-expect-error test mock injection
     derivBus.setBuffer("1HZ25V", ticks);
 
     const mockIntel: any = {

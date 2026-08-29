@@ -158,7 +158,12 @@ export function rankOpportunities(
    * table re-ranks every second and must not pollute scan-to-scan persistence.
    */
   recordHistory = false,
-): { ranked: RankedOpportunity[]; rejected: ScanResult["rejected"] } {
+): {
+  ranked: RankedOpportunity[];
+  rejected: ScanResult["rejected"];
+  exposureReport?: import("@/types/sentinel").PortfolioExposureReport;
+  circuitBreaker?: import("@/types/sentinel").CircuitBreakerState;
+} {
   const rejected: ScanResult["rejected"] = [];
 
   // Ingest all active market intels into the 90-cell Observation Engine
@@ -636,7 +641,7 @@ export function rankOpportunities(
   let runningPnl = 0;
   let maxDrawdown = 0;
   for (const t of pastTradeList) {
-    const pnl = t.outcome === "WIN" ? (t.stake ?? 1) * 0.38 : -(t.stake ?? 1);
+    const pnl = t.outcome === "WIN" ? 1 * 0.38 : -1;
     runningPnl += pnl;
     if (runningPnl > peakPnl) peakPnl = runningPnl;
     const dd = peakPnl - runningPnl;
@@ -652,7 +657,7 @@ export function rankOpportunities(
 
   const openPositions = listPendingTrades().map((t) => ({
     market: t.snapshot.symbol,
-    stake: t.stake ?? 1,
+    stake: 1,
   }));
 
   const stage4 = FinalDecisionEngine.evaluateStage4(ranked, circuitBreaker, openPositions);
@@ -756,8 +761,8 @@ export function scanNow(
     } else if (leadCandidate.executionReady) {
       status = "BEST OF 90 — EXECUTION READY";
     } else if (
-      leadCandidate.entryPoint.status === "WAIT" ||
-      leadCandidate.signal.state === "VALID_WAIT_ENTRY" ||
+      leadCandidate.entryPoint.status === "NOT_READY" ||
+      leadCandidate.signal.waitForEntry ||
       leadCandidate.entryClearance.verdict === "WAIT" ||
       !leadCandidate.entryPoint.preferred ||
       leadCandidate.signal.waitForEntry

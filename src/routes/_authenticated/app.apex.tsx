@@ -68,7 +68,7 @@ import {
   type ExecutionMode,
 } from "@/lib/apex/journal";
 import { calibrationTable } from "@/lib/apex/memory";
-import type { RankedOpportunity } from "@/lib/apex/types";
+import type { RankedOpportunity, BestOf90Result } from "@/lib/apex/types";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -816,7 +816,7 @@ function QualityMetrics({
         <div>
           <SectionTitle hint="quantitative evidence">Supporting evidence</SectionTitle>
           <EvidenceList
-            items={c.supports.slice(0, 6)}
+            items={c.supports.slice(0, 6).map((e) => `${e.label} — ${e.detail}`)}
             tone="support"
             empty="No supporting evidence."
           />
@@ -824,7 +824,7 @@ function QualityMetrics({
         <div>
           <SectionTitle hint="quantitative evidence">Conflicting evidence</SectionTitle>
           <EvidenceList
-            items={c.conflicts.slice(0, 6)}
+            items={c.conflicts.slice(0, 6).map((e) => `${e.label} — ${e.detail}`)}
             tone="conflict"
             empty="No material conflicting evidence detected right now."
           />

@@ -217,11 +217,10 @@ export function rankOpportunities(
       (dossier.veto?.active && dossier.veto?.hard),
     );
 
+    // Read-only: qualification is produced by ApexCore's ingestion path only.
     const qualification =
-      observationEngine.qualificationManager.getActive(dossier.cellId) ??
-      (dossier.state === "RIPE"
-        ? observationEngine.qualificationManager.attemptQualify(dossier, Date.now())
-        : null);
+      observationEngine.qualificationManager.getActive(dossier.cellId) ?? null;
+
 
     const entryPoint: EntryPointReport = dossier.entryPoint ??
       (dossier.entryDigit?.raw as EntryPointReport) ??

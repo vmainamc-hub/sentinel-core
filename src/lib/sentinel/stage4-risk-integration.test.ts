@@ -47,7 +47,7 @@ function createMockContracts(marketId: string, biasDigit: number, baseDanger: nu
       confidence: 82,
       opportunity: 78,
       phase: "MATURE",
-      supports: [{ engine: "Distribution", label: "Strong positive bias", weight: 1.5 }],
+      supports: [{ engine: "Distribution", label: "Strong positive bias", detail: "Bias detected", weight: 1.5, n: 1000 }],
       conflicts: [],
       contradiction: 0,
       ageTicks: 1000,
@@ -94,63 +94,51 @@ function createMockMarket(symbol: string, name: string, biasDigit: number = 7, t
     contracts,
     best: contracts[0],
     stats: {
-      total: tickCount,
-      counts: pcts.map((p) => Math.round(p * tickCount)),
+      n: tickCount,
+      freq: pcts.map((p) => Math.round(p * tickCount)),
       pct: pcts,
+      midPct: pcts,
       recentPct: pcts,
+      microPct: pcts,
+      z: pcts.map(() => 0),
+      lastDigit: biasDigit,
       dominant: biasDigit,
-      least: (biasDigit + 5) % 10,
-      entropy: 0.85,
-      evenPct: 0.5,
-      oddPct: 0.5,
-      highPct: biasDigit >= 5 ? 0.65 : 0.35,
-      lowPct: biasDigit < 5 ? 0.65 : 0.35,
+      suppressed: (biasDigit + 5) % 10,
     },
     pressure: {
-      window15: { winner: "OVER", overPct: 0.65, underPct: 0.35, net: 0.3 },
-      window30: { winner: "OVER", overPct: 0.62, underPct: 0.38, net: 0.24 },
-      window60: { winner: "OVER", overPct: 0.60, underPct: 0.40, net: 0.20 },
-      window120: { winner: "OVER", overPct: 0.58, underPct: 0.42, net: 0.16 },
-      trend: "OVER",
-      bias: "OVER",
-      velocity: 0.15,
-      acceleration: 0.05,
-      net: 0.22,
+      pressure: pcts.map(() => 0.1),
+      impulse: pcts.map(() => 0.05),
+      lifecycle: pcts.map(() => "STABLE" as any),
+      exhaustion: pcts.map(() => 0.1),
+      zoneAShare: 0.5,
+      zoneBShare: 0.5,
+      migration: 0.1,
     },
     transition: null,
     sequence: null,
     entropy: {
       entropy: 0.82,
-      maxEntropy: 1.0,
-      normalized: 0.82,
-      regime: "TRENDING",
-      isUniform: false,
+      chi2: 3.5,
+      uniformityFail: false,
     },
     anomaly: null,
     volatility: {
+      base: 0.1,
+      recent: 0.105,
       ratio: 1.05,
-      state: "NORMAL",
-      stdev: 0.12,
-      mean: 0.1,
+      label: "normal",
     },
     trend: null,
     regime: {
-      id: "TRENDING",
-      label: "TRENDING",
+      label: "TRENDING" as any,
       confidence: 85,
-      sampleSize: tickCount,
-      stability: 90,
-      summary: "Stable directional trend detected.",
+      detail: "Stable directional trend detected.",
     },
     personality: null,
     buildup: null,
     quality: {
-      overallScore: 82,
-      grade: "A",
-      liquidity: 90,
-      stability: 85,
-      signalToNoise: 80,
-      summary: "High quality streaming data.",
+      score: 82,
+      detail: "High quality streaming data.",
     },
     danger: dangerVal,
     updatedAt: Date.now(),
@@ -162,10 +150,16 @@ function createMockMarket(symbol: string, name: string, biasDigit: number = 7, t
     psychology: null,
     specialDigits: null,
     fluctuation: {
+      n: tickCount,
       score: 18,
-      state: "CALM",
-      flickerRate: 0.02,
-      summary: "Calm market environment with low noise.",
+      state: "CALM" as any,
+      signalFlickerRate: 0.02,
+      edgeSignFlipRate: 0.01,
+      confidenceOscillation: 0.05,
+      psychologyFlipRate: 0.01,
+      rankChurn: 0.02,
+      drivers: [],
+      summary: "Stable evidence.",
     },
   };
 }
@@ -341,7 +335,7 @@ describe("Stage 4 Master Verification Test Suite (Tests 1 - 10)", () => {
 
     expect(exposureReport.recommendation).toBe("TRIM");
     // The lower-scoring R_75 ($15 + $15 = $30 > $25 group ceiling) should be held
-    const r75 = ranked.find((r) => r.symbol === "R_75");
+    const r75 = ranked.find((r: any) => r.symbol === "R_75");
     expect(r75?.finalDecision?.verdict).toBe("HELD_EXPOSURE_CAP");
   });
 
@@ -505,7 +499,7 @@ describe("Section 8: Portfolio Exposure — Anti-Phantom Exposure Tests", () => 
       blocked: false,
     };
 
-    const blockedCandidates: Partial<RankedOpportunity>[] = Array.from({ length: 10 }, (_, i) => ({
+    const blockedCandidates: Partial<RankedOpportunity>[] = Array.from({ length: 10 }, (_, i): Partial<RankedOpportunity> => ({
       symbol: "R_75", // Same correlation group
       contract: {
         id: "OVER_2" as any,
@@ -522,8 +516,8 @@ describe("Section 8: Portfolio Exposure — Anti-Phantom Exposure Tests", () => 
       score: 70,
       entryClearance: { verdict: "BLOCKED" } as any,
       blocked: true,
-      clearance: { state: "BLOCKED", label: "BLOCKED", blockers: ["HARD DANGER"], warnings: [] },
-    }));
+      clearance: { state: "BLOCKED", blockers: ["HARD DANGER"], warnings: [] },
+    } as any));
 
     const allCandidates = [executableCand as RankedOpportunity, ...blockedCandidates as RankedOpportunity[]];
     const { ranked, exposureReport } = FinalDecisionEngine.evaluateStage4(allCandidates, cb, []);
@@ -664,7 +658,7 @@ describe("Section 20: Diagnostic NEAR-SIGNAL Tests", () => {
       } as any,
       score: 85,
       dangerComposition: { total: 20 } as any,
-      clearance: { state: "CLEARED", label: "CLEARED", blockers: [], warnings: [] },
+      clearance: { state: "CLEAR", blockers: [], warnings: [] },
       blocked: false,
       executionReady: true,
       finalDecision: { verdict: "CLEARED" } as any,
@@ -777,8 +771,8 @@ describe("Section 7: Single Authoritative Stage 4 Call-Graph & Consumer Fidelity
       expect(cand.finalDecision).toBeDefined();
       expect(cand.recommendedStake).toBeDefined();
       expect(cand.nearSignal).toBeDefined();
-      expect(cand.finalDecision.circuitBreaker).toBeDefined();
-      expect(cand.finalDecision.significance).toBeDefined();
+      expect(cand.finalDecision!.circuitBreaker).toBeDefined();
+      expect(cand.finalDecision!.significance).toBeDefined();
     }
   });
 

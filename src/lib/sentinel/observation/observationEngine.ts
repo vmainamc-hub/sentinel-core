@@ -126,6 +126,30 @@ export class ObservationEngine {
     this.lastError = err instanceof Error ? err.message : String(err);
   }
 
+  /** Exactly-once ingestion telemetry: accepted vs rejected observations. */
+  getIngestStats(): {
+    accepted: number;
+    duplicates: number;
+    stale: number;
+    lastIngestAt: number;
+  } {
+    return {
+      accepted: this.acceptedCount,
+      duplicates: this.duplicateCount,
+      stale: this.staleCount,
+      lastIngestAt: this.lastIngestAt,
+    };
+  }
+
+  /** Test/reset hook — clears exactly-once bookkeeping only. */
+  resetIngestGuards(): void {
+    this.lastAcceptedTs.clear();
+    this.acceptedCount = 0;
+    this.duplicateCount = 0;
+    this.staleCount = 0;
+  }
+
+
   getHealthStatus(): ObservationEngineHealthReport {
     const totalCells = this.cells.size;
     let activeCells = 0;

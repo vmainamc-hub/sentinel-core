@@ -64,6 +64,12 @@ export class ObservationEngine {
   private lastTickAt = 0;
   private errorsCount = 0;
   private lastError: string | null = null;
+  /** Exactly-once ingestion bookkeeping (per cell source identity). */
+  private lastAcceptedTs = new Map<CellId, number>();
+  private acceptedCount = 0;
+  private duplicateCount = 0;
+  private staleCount = 0;
+
 
   constructor() {
     for (const id of ALL_CELL_IDS) {

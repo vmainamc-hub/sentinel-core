@@ -192,12 +192,13 @@ describe("SENTINEL MASTER TEST SUITE — ARCHITECTURE TESTS 1 TO 13", () => {
   // TEST 10 — ENTRY CLEARANCE WAIT
   it("TEST 10: strong setup but entry clearance WAIT -> QUALIFIED / VALID_WAIT_ENTRY", () => {
     const clearance = assessEntryClearance({
-      setup: { score: 75, grade: "GOOD", autoBlocked: false, components: [] as any, summary: "", confidence: 80, sampleSize: 50, recentSampleSize: 20, direction: {} as any, danger: {} as any, factors: [] },
-      danger: { total: 20, autoBlock: [], components: [] as any, isHardBlocked: false, level: "LOW" as any, factors: [] as any, summary: "" },
+      setup: { score: 75, grade: "GOOD", autoBlocked: false, summary: "", confidence: 80, sampleSize: 50, recentSampleSize: 20, direction: {} as any, danger: {} as any, factors: [] },
+      danger: { total: 20, autoBlock: [], components: [], severe: [], isHardBlocked: false, level: "LOW", summary: "", overallDangerScore: 20, dangerFactor: 1 },
       combo: {
         exact: { n: 0, winRate: 0.5, weightedN: 0, edge: 0, pnl: 0, sharpe: 0, key: "" } as any,
-        marketContract: null,
-        marketOnly: null,
+        bestEntryCondition: null,
+        siblings: [],
+        regimeSiblings: [],
       },
       triggerActive: false, // Trigger not firing -> WAIT
     });
@@ -534,7 +535,6 @@ describe("SENTINEL MASTER TEST SUITE — FOUR QUALITY SYSTEMS & THRESHOLDS (TEST
       entryPrice: 100,
       exitPrice: 101,
       state: {
-        score: 82,
         regime: "TRENDING",
         engineVotes: [
           { engine: "Digit Pressure", weight: 1.0 },

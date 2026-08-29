@@ -241,7 +241,7 @@ class DerivTickBus {
 
     this.setStatus("connecting");
     const activeUrl = DERIV_FALLBACK_ENDPOINTS[this.endpointIndex % DERIV_FALLBACK_ENDPOINTS.length];
-    
+
     let ws: WebSocket;
     try {
       ws = new WebSocket(activeUrl);
@@ -251,11 +251,17 @@ class DerivTickBus {
       this.scheduleReconnect();
       return;
     }
+    // Any socket created earlier is now obsolete: its handlers must not be
+    // able to touch buffers, status, subscriptions or reconnect state.
+    const gen = ++this.generation;
     this.ws = ws;
+    this.pendingHistory.clear();
+    this.inflightBySymbol.clear();
 
     // Handshake Timeout Guard: if connection hangs in CONNECTING state, abort and failover
     this.handshakeTimer = setTimeout(() => {
       this.handshakeTimer = null;
+      if (gen !== this.generation) return;
       if (ws.readyState === WebSocket.CONNECTING) {
         try {
           ws.close();
@@ -266,6 +272,12 @@ class DerivTickBus {
     }, HANDSHAKE_TIMEOUT_MS);
 
     ws.onopen = () => {
+      if (gen !== this.generation) {
+        try {
+          ws.close();
+        } catch {}
+        return;
+      }
       if (this.handshakeTimer) {
         clearTimeout(this.handshakeTimer);
         this.handshakeTimer = null;
@@ -273,6 +285,8 @@ class DerivTickBus {
       this.setStatus("live");
       this.reconnectDelay = 1000;
       this.subIds.clear();
+      this.catchupCooldown.clear();
+      this.catchupFailures.clear();
       this.lastMessageAt = Date.now();
       for (const sym of this.refcount.keys()) {
         this.sendHistoryRequest(sym);
@@ -283,11 +297,13 @@ class DerivTickBus {
     };
 
     ws.onmessage = (ev) => {
+      if (gen !== this.generation) return; // stale socket — ignore entirely
       this.lastMessageAt = Date.now();
       let msg: any;
       try {
         msg = JSON.parse(ev.data);
       } catch {
+
         return;
       }
       if (msg.pong || msg.msg_type === "ping" || msg.ping) {
